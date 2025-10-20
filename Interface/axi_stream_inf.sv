@@ -4,6 +4,7 @@
 interface axi_str_inf();
 
 parameter DATA_SIZE=32;
+parameter USER_SIZE=16;
 
   logic reset_n;
   logic tvalid;   //AXI Stream valid signal

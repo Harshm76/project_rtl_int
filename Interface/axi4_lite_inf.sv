@@ -4,13 +4,14 @@
 interface axi_lite_inf();
 
 parameter DATA_SIZE=32;
-parameter ADDR_SIAE=32;
+parameter ADDR_SIZE=32;
+parameter ID_SIZE=32;
 
   logic reset_n;
   logic awvalid;   //AXI Stream valid signal
   logic awready;
-  logic [ADDR_SIAE-1:0] awaddr;
-  logic awid;
+  logic [ADDR_SIZE-1:0] awaddr;
+  logic [(ID_SIZE-1):0] awid;
   logic awsize;
   logic awlen;
   logic awburst;  
@@ -23,19 +24,19 @@ parameter ADDR_SIAE=32;
   logic bready;
   logic bvalid;
   logic bresp;
-  logic bid;
+  logic [(ID_SIZE-1):0] bid;
 
   logic arready;
   logic arvalid;
-  logic [ADDR_SIAE-1:0] araddr;
-  logic arid;
+  logic [ADDR_SIZE-1:0] araddr;
+  logic [(ID_SIZE-1):0] arid;
   logic arsize;
   
   logic rvalid;
   logic rready;
   logic [DATA_SIZE-1:0] rdata;
   logic rlast;
-  logic rid;
+  logic [(ID_SIZE-1):0] rid;
   logic rresp;
 
 modport slvae(input    reset_n, awvalid, awaddr, awid, awsize,
