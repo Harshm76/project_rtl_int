@@ -112,12 +112,90 @@ module register_memory_axi_lite #(
       axi_if.rlast  <= 1'b0;
     end
   end
+
+// ---------------- AXI-Stream Packet Capture ---------------- 
+
+  // Queues
+  logic [AXIS_DATA_SIZE-1:0] axis_pkt_temp_tdata_q[NUM_PORTS][$];
+  logic [USER_SIZE-1:0]      axis_pkt_temp_tuser_q[NUM_PORTS][$];
+
+// Step 1: make_packet()
+  task make_packet();
+    foreach (axis_in_inf[i]) begin
+      fork
+        forever begin
+          @(posedge clk iff axis_in_inf[i].tvalid);
+          axis_pkt_temp_tdata_q[i].push_back(axis_in_inf[i].tdata);
+          axis_pkt_temp_tuser_q[i].push_back(axis_in_inf[i].tuser);
+
+          if (axis_in_inf[i].tlast)
+            $display("[%0t] Packet captured from port %0d, size=%0d", $time, i, axis_pkt_temp_tdata_q[i].size());
+        end
+      join_none
+    end
+  endtask
+
+  // Step 2: buffer()
+  logic [AXIS_DATA_SIZE-1:0] axis_buffer_tdata_q[NUM_PORTS][$];
+  logic [USER_SIZE-1:0]      axis_buffer_tuser_q[NUM_PORTS][$];
+
+  task buffer();
+    forever begin
+      foreach (axis_in_inf[i]) begin
+        wait(axis_pkt_temp_tdata_q[i].size() != 0);
+        axis_buffer_tdata_q[i].push_back(axis_pkt_temp_tdata_q[i].pop_front());
+        axis_buffer_tuser_q[i].push_back(axis_pkt_temp_tuser_q[i].pop_front());
+      end
+      @(posedge clk);
+    end
+  endtask
+initial begin
+fork
+      make_packet();
+      buffer();
+      parser();
+    join_none
+end
 task parser;
 
      //check interface axi stream
      //read memory (register)
      //check packet is valid or not
+  int index;
+    bit [DATA_SIZE-1:0] expected_connection;
+    bit [DATA_SIZE-1:0] expected_output;
+    bit [DATA_SIZE-1:0] expected_crc;
+    connection_addr_t connection_addr;
+    logic [AXIS_DATA_SIZE-1:0] tdata_packet;
+    logic [USER_SIZE-1:0]      tuser_packet;
 
+    forever begin
+      foreach (axis_buffer_tdata_q[i]) begin
+        wait(axis_buffer_tdata_q[i].size() != 0);
+        tdata_packet = axis_buffer_tdata_q[i].pop_front();
+        tuser_packet = axis_buffer_tuser_q[i].pop_front();
+
+        // Extract VLAN and Port
+        connection_addr.vlan    = tuser_packet[USER_SIZE-1 -: 12];
+        connection_addr.port_id = tuser_packet[2:0];
+        index = (connection_addr.port_id << 12) | connection_addr.vlan;
+
+        expected_connection = connection_config_mem[index];
+        expected_output     = output_port[connection_addr.port_id];
+        expected_crc        = crc_mem[connection_addr.port_id];            // Check packet against memories
+            if(tdata_packet == expected_connection &&
+               tdata_packet == expected_output &&
+               tdata_packet == expected_crc) begin
+                $display("[%0t] PACKET VALID: port=%0d vlan=%0d data=0x%0h",
+                         $time, connection_addr.port_id, connection_addr.vlan_id, tdata_packet);
+            end
+            else begin
+                $display("[%0t] PACKET INVALID: port=%0d vlan=%0d data=0x%0h | expected_connection=0x%0h expected_output=0x%0h expected_crc=0x%0h",
+                         $time, connection_addr.port_id, connection_addr.vlan_id,
+                         tdata_packet, expected_connection, expected_output, expected_crc);
+            end
+        end
+    end
 end
 
 endtask 
