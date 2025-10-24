@@ -112,13 +112,96 @@ module register_memory_axi_lite #(
       axi_if.rlast  <= 1'b0;
     end
   end
-task parser;
 
-     //check interface axi stream
-     //read memory (register)
-     //check packet is valid or not
+// ---------------- AXI-Stream Packet Capture ---------------- 
+  always@(posedge clk) begin
+      if(!reset_n) begin
+	//counter;
+      end
+      else begin
+          make_packet();
+          parser();
+      end
+  end
 
-end
+  // Queues
+  logic [AXIS_DATA_SIZE-1:0] axis_pkt_temp_tdata_q[$][$];
+  logic [(AXIS_DATA_SIZE/8)-1:0] axis_pkt_temp_tkeep_q[$][$];
+  logic [USER_SIZE-1:0]      axis_pkt_temp_tuser_q[$];
 
-endtask 
+  //valid packet queue
+  logic [AXIS_DATA_SIZE-1:0] axis_session_valid_pkt_tdata_q[$][$];
+  logic [(AXIS_DATA_SIZE/8)-1:0] axis_session_valid_pkt_tkeep_q[$][$];
+  logic [USER_SIZE-1:0]      axis_session_valid_pkt_tuser_q[$];
+  int valid_pkt_num;
+  int invalid_session_pkt_num;
+
+// Step 1: make_packet()
+  task make_packet();
+    int pkt_num;  
+    @(posedge clk iff axis_in_inf.tvalid);
+    if(!axis_in_inf == 1'b0) begin
+          @(posedge clk iff axis_in_inf.tready);
+    end
+    axis_pkt_temp_tdata_q[pkt_num].push_back(axis_in_inf.tdata);
+    axis_pkt_temp_tkeep_q[pkt_num].push_back(axis_in_inf.tkeep);
+    axis_pkt_temp_tuser_q[pkt_num].push_back(axis_in_inf.tuser);
+
+    if (axis_in_inf.tlast) begin
+          @(posedge clk);
+	pkt_num++;
+          //$display("[%0t] Packet captured from port %0d, size=%0d", $time, i, axis_pkt_temp_tdata_q[i].size());
+    end
+  endtask
+
+//step 2
+  task parser;
+       //check interface axi stream
+       //read memory (register)
+       //check packet is valid or not
+      bit [USER_SIZE-1:0] index;
+      bit [DATA_SIZE-1:0] expected_connection;
+      bit [DATA_SIZE-1:0] expected_output;
+      bit [DATA_SIZE-1:0] expected_crc;
+      connection_addr_t connection_addr;
+      logic [AXIS_DATA_SIZE-1:0] tdata_packet[$];
+      logic [(AXIS_DATA_SIZE/8)-1:0] tkeep_packet[$];
+      logic [USER_SIZE-1:0]      tuser_packet;
+  
+      wait(axis_pkt_temp_tdata_q.size() != 0);
+      foreach (axis_pkt_temp_tdata_q[i]) begin
+          tdata_packet.push_back(axis_pkt_temp_tdata_q[i].pop_front());
+          tkeep_packet.push_back(axis_pkt_temp_tkeep_q[i].pop_front());
+          tuser_packet = axis_buffer_tuser_q[i].pop_front();
+      end
+      // Extract VLAN and Port
+      connection_addr.vlan    = {<<8{tuser_packet[USER_SIZE-1 : 3]}};
+      connection_addr.port_id = tuser_packet[2:0];
+      index = {connection_addr.port_id,connection_addr.vlan};
+  
+      expected_connection = connection_config_mem[index];
+      expected_output     = output_port[connection_addr.port_id];
+      expected_crc        = crc_mem[connection_addr.port_id];            // Check packet against memories
+      if(tdata_packet[((SRC_ADDR_WIDTH + DST_ADDR_WIDTH)/32)][12:0] == expected_connection) begin
+         foreach(tdata_packet[i]) begin 
+            axis_session_valid_pkt_tdata_q[valid_pkt_num].push_back(tdata_packet.pop_front());
+            axis_session_valid_pkt_tkeep_q[valid_pkt_num].push_back(tkeep_packet.pop_front());
+            axis_session_valid_pkt_tuser_q.push_back(tuser_packet);
+         end
+         valid_pkt_num++;
+         tdata_packet.delete();
+         tkeep_packet.delete();
+         $display("[%0t] PACKET VALID: port=%0d vlan=%0d data=0x%0h",
+         $time, connection_addr.port_id, connection_addr.vlan_id, tdata_packet);
+      end
+      else begin
+         tdata_packet.delete();
+         tkeep_packet.delete();
+         invalid_session_pkt_num++;
+         $display("[%0t] PACKET INVALID: port=%0d vlan=%0d data=0x%0h | expected_connection=0x%0h expected_output=0x%0h expected_crc=0x%0h",
+         $time, connection_addr.port_id, connection_addr.vlan_id,
+         tdata_packet, expected_connection, expected_output, expected_crc);
+      end
+  endtask 
+
 endmodule

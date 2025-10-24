@@ -109,7 +109,7 @@ task arbiter();
   // Port 0 -> Arbiter Output
   while (axis_buffer_port_tdata_q[0].size() != 0) begin
     buffer_q_size[0] -= axis_buffer_port_tdata_q[0][0].size();
-    connection_addr.vlan_id = {<<8{axis_buffer_port_tdata_q[0][0][((SRC_ADDR_WIDTH + DST_ADDR_WIDTH)/32)][107:96]}};
+    connection_addr.vlan_id = {<<8{axis_buffer_port_tdata_q[0][0][((SRC_ADDR_WIDTH + DST_ADDR_WIDTH)/32)][12:0]}};
     connection_addr.port_id = 0;
     axis_tuser_q.push_back({connection_addr.vlan_id, connection_addr.port_id});
     axis_arbiter_output_tdata_q.push_back(axis_buffer_port_tdata_q[0].pop_front());
@@ -120,7 +120,7 @@ task arbiter();
   // Port 1 -> Arbiter Output
   while (axis_buffer_port_tdata_q[1].size() != 0) begin
     buffer_q_size[1] -= axis_buffer_port_tdata_q[1][0].size();
-    connection_addr.vlan_id = {<<8{axis_buffer_port_tdata_q[1][0][((SRC_ADDR_WIDTH + DST_ADDR_WIDTH)/32)][107:96]}};
+    connection_addr.vlan_id = {<<8{axis_buffer_port_tdata_q[1][0][((SRC_ADDR_WIDTH + DST_ADDR_WIDTH)/32)][12:0]}};
     connection_addr.port_id = 1;
     axis_tuser_q.push_back({connection_addr.vlan_id, connection_addr.port_id});
     axis_arbiter_output_tdata_q.push_back(axis_buffer_port_tdata_q[1].pop_front());
@@ -131,7 +131,7 @@ task arbiter();
   // Port 2 -> Arbiter Output
   while (axis_buffer_port_tdata_q[2].size() != 0) begin
     buffer_q_size[2] -= axis_buffer_port_tdata_q[2][0].size();
-    connection_addr.vlan_id = {<<8{axis_buffer_port_tdata_q[2][0][((SRC_ADDR_WIDTH + DST_ADDR_WIDTH)/32)][107:96]}};
+    connection_addr.vlan_id = {<<8{axis_buffer_port_tdata_q[2][0][((SRC_ADDR_WIDTH + DST_ADDR_WIDTH)/32)][12:0]}};
     connection_addr.port_id = 2;
     axis_tuser_q.push_back({connection_addr.vlan_id, connection_addr.port_id});
     axis_arbiter_output_tdata_q.push_back(axis_buffer_port_tdata_q[2].pop_front());
