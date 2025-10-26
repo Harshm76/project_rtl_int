@@ -28,12 +28,24 @@ int axis_arbiter_output_count;
 
 //count of packet drived by each port
 int pkt_count_port[3];
-
 connection_addr_t connection_addr;
 
 always @(posedge clk) begin
+  logic internal_rst_n; // Internal reset signal
+    static logic [1:0] reset_delay_counter = 2'd0; // Static counter for reset delay
+
+    // Reset delay logic
+    if (!rst_n) begin
+        reset_delay_counter <= 2'd0;
+        internal_rst_n <= 1'b0; // Assert internal reset
+    end else if (reset_delay_counter < 2'd2) begin
+        reset_delay_counter <= reset_delay_counter + 1;
+        internal_rst_n <= 1'b0; // Keep internal reset active for 2 cycles
+    end else begin
+        internal_rst_n <= 1'b1; // Deassert internal reset after 2 cycles
+    end
   
-  if(!rst_n) begin
+  if(!internal_rst_n) begin
     foreach(axis_pkt_temp_port_tdata_q[i]) axis_pkt_temp_port_tdata_q[i].delete();
     foreach(axis_pkt_temp_port_tkeep_q[i]) axis_pkt_temp_port_tkeep_q[i].delete();
     foreach(axis_buffer_port_tdata_q[i]) axis_buffer_port_tdata_q[i].delete();

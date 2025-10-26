@@ -1,10 +1,10 @@
 
 
 
-interface axi_str_inf();
-
+interface axi_str_inf#(int DATA_SIZE = 32,int USER_SIZE = 16);
+/*
 parameter DATA_SIZE=32;
-parameter USER_SIZE=16;
+parameter USER_SIZE=16;*/
 
   logic reset_n;
   logic tvalid;   //AXI Stream valid signal

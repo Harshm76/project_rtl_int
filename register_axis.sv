@@ -5,7 +5,7 @@ module register_memory_axi_lite #(
   int AXIS_DATA_SIZE = 32,
   int USER_SIZE = 16    
 )(
-  input  logic clk,
+  input  logic reg_clk,
   axi_lite_inf.slave #(DATA_SIZE, ADDR_SIZE, ID_SIZE) axi_if,
   axi_str_inf.slave #(AXIS_DATA_SIZE,USER_SIZE) axis_in_inf
 );
@@ -22,7 +22,7 @@ module register_memory_axi_lite #(
   bit [1:0] bresp;
   bit [1:0] rresp;
   // ---------------- Write Logic ----------------
-  always_ff @(posedge clk) begin
+  always_ff @(posedge reg_clk) begin
     if (!axi_if.reset_n) begin
       axi_if.awready <= 1'b0;
       axi_if.wready  <= 1'b0;
@@ -33,13 +33,13 @@ module register_memory_axi_lite #(
       axi_if.wready  <= 1'b1;
       axi_if.bvalid <= 1'b0;
       fork
-        @(posedge clk iff axi_if.awvalid);
+        @(posedge reg_clk iff axi_if.awvalid);
 		if(!axi_if.awready) begin
-		  @(posedge clk iff axi_if.awready);
+		  @(posedge reg_clk iff axi_if.awready);
 		end
-        @(posedge clk iff axi_if.wvalid);
+        @(posedge reg_clk iff axi_if.wvalid);
 		if(!axi_if.wready) begin
-		  @(posedge clk iff axi_if.wready);
+		  @(posedge reg_clk iff axi_if.wready);
 		end
 	  join_any
 	  awaddr = axi_if,addr;
@@ -64,13 +64,13 @@ module register_memory_axi_lite #(
       else begin
          bresp <= 2'b10;
       end
-      @(posedge clk iff axi_if.bready);
+      @(posedge reg_clk iff axi_if.bready);
       axi_if.bvalid <= 1'b0;
     end
   end
 
   // ---------------- Read Logic ----------------
-  always_ff @(posedge clk) begin
+  always_ff @(posedge reg_clk) begin
     if (!axi_if.reset_n) begin
       axi_if.arready <= 1'b0;
       axi_if.rvalid  <= 1'b0;
@@ -79,9 +79,9 @@ module register_memory_axi_lite #(
       axi_if.arready <= 1'b1;
       axi_if.rvalid <= 1'b0;
       fork
-        @(posedge clk iff axi_if.arvalid);
+        @(posedge reg_clk iff axi_if.arvalid);
         if(!axi_if.arready) begin
-          @(posedge clk iff axi_if.arready);
+          @(posedge reg_clk iff axi_if.arready);
         end
       join
 
@@ -107,18 +107,27 @@ module register_memory_axi_lite #(
       axi_if.rvalid <= 1'b1;
       axi_if.rresp  <= rresp;
       axi_if.rlast  <= 1'b1;
-      @(posedge clk iff axi_if.rready);
+      @(posedge reg_clk iff axi_if.rready);
       axi_if.rvalid <= 1'b0;
       axi_if.rlast  <= 1'b0;
     end
   end
-
+  int valid_counter;
+  int invalid_counter;
 // ---------------- AXI-Stream Packet Capture ---------------- 
   always@(posedge clk) begin
       if(!reset_n) begin
 	//counter;
+	valid_counter <=0;
+	invalid_counter <=0;
       end
       else begin
+	  if(tvalid)begin
+        valid_counter <= valid_counter +1;
+	  end 
+	  else begin
+        invalid_counter <= invalid_counter +1;
+	  end
           make_packet();
           parser();
       end
@@ -178,8 +187,9 @@ module register_memory_axi_lite #(
       connection_addr.vlan    = {<<8{tuser_packet[USER_SIZE-1 : 3]}};
       connection_addr.port_id = tuser_packet[2:0];
       index = {connection_addr.port_id,connection_addr.vlan};
-  
+      
       expected_connection = connection_config_mem[index];
+      if(expected_connection[7] == 1'b1)begin
       expected_output     = output_port[connection_addr.port_id];
       expected_crc        = crc_mem[connection_addr.port_id];            // Check packet against memories
       if(tdata_packet[((SRC_ADDR_WIDTH + DST_ADDR_WIDTH)/32)][12:0] == expected_connection) begin
@@ -194,6 +204,7 @@ module register_memory_axi_lite #(
          $display("[%0t] PACKET VALID: port=%0d vlan=%0d data=0x%0h",
          $time, connection_addr.port_id, connection_addr.vlan_id, tdata_packet);
       end
+     end 
       else begin
          tdata_packet.delete();
          tkeep_packet.delete();

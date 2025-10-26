@@ -1,11 +1,11 @@
 
 
 
-interface axi_lite_inf();
-
+interface axi_lite_inf #(int DATA_SIZE=32,int ADDR_SIZE=32,ID_SIZE = 32);
+/*
 parameter DATA_SIZE=32;
 parameter ADDR_SIZE=32;
-parameter ID_SIZE=32;
+parameter ID_SIZE=32;*/
 
   logic reset_n;
   logic awvalid;   //AXI Stream valid signal
